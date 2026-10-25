@@ -106,9 +106,8 @@ the KeySequence library depends only on Terminal.Gui.
 
 - [Usage guide](docs/keysequences.md)
 - [Specification](docs/specification.md)
-- [Source provenance](NOTICE.md)
 - [Terminal.Gui](https://github.com/tui-cs/Terminal.Gui)
 
 ## License
 
-[MIT](LICENSE). See [NOTICE.md](NOTICE.md) for the extracted feature's history.
+[MIT](LICENSE).
