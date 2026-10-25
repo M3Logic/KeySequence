@@ -1,0 +1,31 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DisableRealDriverIO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore
+      - run: dotnet build -c Release --no-restore
+      - run: dotnet test --project tests/KeySequence.Tests -c Release --no-build
+      - run: dotnet pack src/KeySequence -c Release --no-build -o artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeySequence-${{ matrix.os }}
+          path: artifacts/*.nupkg

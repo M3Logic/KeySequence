@@ -1,0 +1,21 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,slnx,yml,json}]
+indent_size = 2
+
+[*.cs]
+csharp_space_between_method_call_name_and_opening_parenthesis = true
+csharp_space_between_method_declaration_name_and_open_parenthesis = true
+csharp_space_before_open_square_brackets = true
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = false:warning
+csharp_style_var_elsewhere = false:warning
+csharp_style_implicit_object_creation_when_type_is_apparent = true:warning

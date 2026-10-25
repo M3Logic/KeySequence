@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UseAppHost>true</UseAppHost>
+    <IsTestProject>true</IsTestProject>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NoLogo>true</NoLogo>
+    <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/KeySequence/KeySequence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Terminal.Gui.Input" />
+    <Using Include="Terminal.Gui.KeySequence" />
+    <Using Include="Terminal.Gui.ViewBase" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

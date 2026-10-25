@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>KeySequence</AssemblyName>
+    <RootNamespace>Terminal.Gui.KeySequence</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <PackageId>KeySequence</PackageId>
+    <Version>0.1.0-alpha.1</Version>
+    <Authors>M3Logic</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/M3Logic/KeySequence</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/M3Logic/KeySequence.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Description>Add-on for Terminal.Gui leader-key and multi-key command sequences.</Description>
+    <PackageTags>terminal.gui, tui, keybindings, vim, command-sequences</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Terminal.Gui" Version="[2.4.3,3.0.0)" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../NOTICE.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Terminal.Gui.KeySequence.Demo</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/KeySequence/KeySequence.csproj" />
+    <PackageReference Include="Terminal.Gui.Editor" Version="2.4.1" />
+  </ItemGroup>
+</Project>

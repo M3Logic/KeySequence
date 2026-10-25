@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KeySequence/KeySequence.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KeySequence.Tests/KeySequence.Tests.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/KeySequence.Demo/KeySequence.Demo.csproj" />
+  </Folder>
+</Solution>
