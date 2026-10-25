@@ -2,6 +2,69 @@ namespace Terminal.Gui.KeySequence.Tests;
 
 public class KeySequenceBindingsTests
 {
+    [Theory]
+    [InlineData (false)]
+    [InlineData (true)]
+    public void Modifier_Only_Events_Preserve_Pending_Sequences (bool persistent)
+    {
+        KeySequenceBindings bindings = new ()
+            { Mode = persistent ? KeySequenceMode.Persistent : KeySequenceMode.Leader };
+        int invocations = 0;
+        List<KeySequenceResult> results = [];
+        bindings.StateChanged += (_, args) => results.Add (args.Result);
+        if (persistent)
+        {
+            bindings.AddMode ("d d", _ => ++invocations > 0);
+        }
+        else
+        {
+            bindings.Add ("; d d", _ => ++invocations > 0);
+        }
+
+        using View target = new ();
+        Assert.Equal (KeySequenceResult.NotLeader, bindings.ProcessKey (target, Key.Empty.WithShift));
+        Assert.Empty (results);
+        bindings.ProcessKey (target, persistent ? Key.Esc : new Key (';'));
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, 'd'));
+        int notificationCount = results.Count;
+        Key [] modifiers =
+        [
+            Key.Empty.WithShift,
+            Key.Empty.WithCtrl,
+            Key.Empty.WithAlt,
+            new Key () { ModifierKey = ModifierKey.LeftShift },
+            new Key () { ModifierKey = ModifierKey.RightShift },
+            new Key () { ModifierKey = ModifierKey.LeftCtrl }
+        ];
+
+        foreach (Key modifier in modifiers)
+        {
+            Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, modifier));
+        }
+
+        Assert.Equal (notificationCount, results.Count);
+        Assert.True (bindings.IsCapturing);
+        Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'd'));
+        Assert.Equal (1, invocations);
+    }
+
+    [Theory]
+    [InlineData ("q", "Ctrl+Q")]
+    [InlineData ("q", "Alt+Q")]
+    [InlineData ("q", "Q")]
+    [InlineData ("g", "G")]
+    [InlineData ("<Tab>", "Shift+Tab")]
+    public void Printable_Matching_Preserves_Shortcut_Modifiers_And_Case (string pattern, string input)
+    {
+        KeySequenceBindings bindings = new () { Mode = KeySequenceMode.Persistent };
+        bindings.AddMode (pattern, _ => throw new InvalidOperationException ("Unexpected match"));
+        bindings.EnterCommandMode ();
+        using View target = new ();
+        Assert.True (Key.TryParse (input, out Key key));
+
+        Assert.Equal (KeySequenceResult.Rejected, bindings.ProcessKey (target, key));
+    }
+
     [Fact]
     public void ProcessKey_Matches_Count_Motion ()
     {

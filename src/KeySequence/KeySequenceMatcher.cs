@@ -68,12 +68,28 @@ internal static class KeySequenceMatcher
 
         KeySequenceToken token = tokens [tokenIndex];
 
-        if (token.Key is null || token.Key != keys [keyIndex])
+        if (token.Key is null || !MatchesLiteral (token.Key, keys [keyIndex]))
         {
             return CandidateMatch.NoMatch;
         }
 
         return MatchFrom (tokens, keys, tokenIndex + 1, keyIndex + 1, countText, values);
+    }
+
+    private static bool MatchesLiteral (Key expected, Key actual)
+    {
+        if (expected == actual)
+        {
+            return true;
+        }
+
+        if (expected.IsCtrl || expected.IsAlt || actual.IsCtrl || actual.IsAlt)
+        {
+            return false;
+        }
+
+        return expected.TryGetPrintableRune (out Rune expectedRune) &&
+               actual.TryGetPrintableRune (out Rune actualRune) && expectedRune == actualRune;
     }
 
     private static CandidateMatch MatchCount (

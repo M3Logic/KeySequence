@@ -1,5 +1,6 @@
 using System.Text;
 using Terminal.Gui.Input;
+using Terminal.Gui.Drivers;
 using Terminal.Gui.ViewBase;
 
 namespace Terminal.Gui.KeySequence;
@@ -129,6 +130,13 @@ public sealed class KeySequenceBindings
         ArgumentNullException.ThrowIfNull (target);
         ArgumentNullException.ThrowIfNull (key);
 
+        // Drivers may report modifier presses and repeats separately from the character they modify.
+        if (key.IsModifierOnly ||
+            key.KeyCode != KeyCode.Null && (key.KeyCode & ~(KeyCode.ShiftMask | KeyCode.CtrlMask | KeyCode.AltMask)) == KeyCode.Null)
+        {
+            return IsCapturing ? KeySequenceResult.Pending : KeySequenceResult.NotLeader;
+        }
+
         KeySequenceResult timeoutResult = ResetIfTimedOut ();
 
         if (timeoutResult == KeySequenceResult.TimedOut && Mode != KeySequenceMode.Persistent && !IsLeader (key))
@@ -155,7 +163,7 @@ public sealed class KeySequenceBindings
             return KeySequenceResult.Started;
         }
 
-        if (!key.IsValid || key.IsModifierOnly)
+        if (!key.IsValid)
         {
             Reset ();
             RaiseStateChanged (KeySequenceResult.Rejected, 0);
@@ -240,7 +248,7 @@ public sealed class KeySequenceBindings
             return KeySequenceResult.ModeExited;
         }
 
-        if (!key.IsValid || key.IsModifierOnly)
+        if (!key.IsValid)
         {
             Reset ();
             RaiseStateChanged (KeySequenceResult.Rejected, CandidateCount ());

@@ -120,7 +120,15 @@ public sealed class KeySequencesDemo
         AddLog ("Edit: d d, 3 d d, y y, v y, v c, p, x, X, u, Ctrl+R");
         AddLog ("Press i to return to normal editing. Press : q to quit.");
 
-        using IDisposable registration = editor.UseKeySequences (
+        using IDisposable registration = RegisterKeySequences (editor, () => app.RequestStop ());
+
+        editor.SetFocus ();
+        app.Run (window);
+    }
+
+    internal IDisposable RegisterKeySequences (TgEditor editor, Action requestStop)
+    {
+        IDisposable registration = editor.UseKeySequences (
             bindings =>
             {
                 bindings.Mode = KeySequenceMode.Persistent;
@@ -172,10 +180,8 @@ public sealed class KeySequencesDemo
             },
             KeySequenceInterceptionMode.Preemptive);
 
-        AddQuitBinding (editor.GetKeySequences (), app);
-
-        editor.SetFocus ();
-        app.Run (window);
+        AddQuitBinding (editor.GetKeySequences (), requestStop);
+        return registration;
     }
 
     private void AddMotionBindings (KeySequenceBindings bindings, TgEditor editor)
@@ -186,7 +192,7 @@ public sealed class KeySequencesDemo
         AddRepeatedCommand (bindings, editor, "<count> j", Command.Down, "j");
         AddRepeatedCommand (bindings, editor, "<count> b", Command.WordLeft, "b");
         AddRepeatedCommand (bindings, editor, "<count> w", Command.WordRight, "w");
-        AddImmediateCommand (bindings, editor, '0', Command.LeftStart, "0");
+        AddImmediateCommand (bindings, editor, KeySequencePattern.CommandMode ().Then ('0'), Command.LeftStart, "0");
         AddCommand (bindings, editor, "$", Command.RightEnd, "$");
         AddCommand (bindings, editor, "g g", Command.Start, "g g");
         AddCommand (bindings, editor, "G", Command.End, "G");
@@ -202,7 +208,8 @@ public sealed class KeySequencesDemo
         AddRepeatedCommand (bindings, editor, "v <count> j", Command.DownExtend, "v j");
         AddRepeatedCommand (bindings, editor, "v <count> b", Command.WordLeftExtend, "v b");
         AddRepeatedCommand (bindings, editor, "v <count> w", Command.WordRightExtend, "v w");
-        AddCommand (bindings, editor, "v 0", Command.LeftStartExtend, "v 0");
+        AddImmediateCommand (bindings, editor, KeySequencePattern.CommandMode ().Then ('v').Then ('0'),
+            Command.LeftStartExtend, "v 0");
         AddCommand (bindings, editor, "v $", Command.RightEndExtend, "v $");
         AddCommand (bindings, editor, "v g g", Command.StartExtend, "v g g");
         AddCommand (bindings, editor, "v G", Command.EndExtend, "v G");
@@ -225,17 +232,18 @@ public sealed class KeySequencesDemo
         AddCountedLineCommand (bindings, editor, "<count> y y", Command.Copy, "y y");
     }
 
-    private void AddQuitBinding (KeySequenceBindings bindings, IApplication app)
+    private void AddQuitBinding (KeySequenceBindings bindings, Action requestStop)
     {
         bindings.AddMode (": q", context =>
         {
             AddLog ($"{FormatSequence (context)} -> quit");
-            app.RequestStop ();
+            requestStop ();
             return true;
         });
     }
 
-    private void AddRepeatedCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command, string display)
+    private void AddRepeatedCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command,
+        string display)
     {
         bindings.AddMode (pattern, context =>
         {
@@ -245,7 +253,8 @@ public sealed class KeySequencesDemo
         });
     }
 
-    private void AddCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command, string display)
+    private void AddCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command,
+        string display)
     {
         bindings.AddMode (pattern, context =>
         {
@@ -255,9 +264,10 @@ public sealed class KeySequencesDemo
         });
     }
 
-    private void AddImmediateCommand (KeySequenceBindings bindings, TgEditor editor, char key, Command command, string display)
+    private void AddImmediateCommand (KeySequenceBindings bindings, TgEditor editor, KeySequencePattern pattern,
+        Command command,
+        string display)
     {
-        KeySequencePattern pattern = KeySequencePattern.CommandMode ().Then (key);
         pattern.MatchMode = KeySequenceMatchMode.Immediate;
         pattern.AllowZeroCount = true;
 
@@ -269,7 +279,8 @@ public sealed class KeySequencesDemo
         });
     }
 
-    private void AddCountedLineCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command, string display)
+    private void AddCountedLineCommand (KeySequenceBindings bindings, TgEditor editor, string pattern, Command command,
+        string display)
     {
         bindings.AddMode (pattern, context =>
         {

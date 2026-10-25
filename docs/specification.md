@@ -388,7 +388,12 @@ Applications can use this to show command palettes, status bar hints, command-mo
 - Adding a duplicate pattern throws `InvalidOperationException`.
 - Adding a pattern with multiple `<count>` tokens throws `ArgumentException`.
 - Parsing an invalid key token throws `FormatException`.
-- Processing an invalid key or modifier-only key returns `Rejected` during capture.
+- Processing an invalid key returns `Rejected` during capture.
+- Modifier-only presses and repeats leave capture unchanged and raise no state notification.
+  They return `Pending` during capture and `NotLeader` while idle.
+- Printable literal keys also match the character reported by Terminal.Gui, so shifted
+  punctuation such as `:` matches whether Shift is retained in the key event or not.
+  Ctrl and Alt shortcuts retain exact key matching.
 - Processing a key while idle returns `NotLeader` unless it starts leader capture or enters persistent command mode.
 
 ## Add-On File Layout

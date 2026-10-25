@@ -7,4 +7,7 @@
     <ProjectReference Include="../../src/KeySequence/KeySequence.csproj" />
     <PackageReference Include="Terminal.Gui.Editor" Version="2.5.8-develop.6" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="KeySequence.Tests" />
+  </ItemGroup>
 </Project>
