@@ -5,6 +5,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/KeySequence/KeySequence.csproj" />
-    <PackageReference Include="Terminal.Gui.Editor" Version="2.4.1" />
+    <PackageReference Include="Terminal.Gui.Editor" Version="2.5.8-develop.6" />
   </ItemGroup>
 </Project>
