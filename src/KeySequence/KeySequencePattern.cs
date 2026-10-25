@@ -59,7 +59,7 @@ public sealed class KeySequencePattern
     }
 
     /// <inheritdoc/>
-    public override string ToString () => LeaderKey is { } leaderKey
-                                              ? $"{leaderKey} {string.Join (" ", _tokens)}".TrimEnd ()
-                                              : string.Join (" ", _tokens);
+    public override string ToString () => LeaderKey != null
+        ? $"{LeaderKey} {string.Join (" ", _tokens)}".TrimEnd ()
+        : string.Join (" ", _tokens);
 }

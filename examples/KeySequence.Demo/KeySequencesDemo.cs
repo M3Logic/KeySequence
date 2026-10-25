@@ -1,10 +1,8 @@
 using System.Collections.ObjectModel;
 using Terminal.Gui.App;
-using Terminal.Gui.Configuration;
 using Terminal.Gui.Drawing;
 using TgEditor = Terminal.Gui.Editor.Editor;
 using Terminal.Gui.Input;
-using Terminal.Gui.KeySequence;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 
@@ -67,15 +65,12 @@ public sealed class KeySequencesDemo
 
     public void Run ()
     {
-        ConfigurationManager.Enable (ConfigLocations.All);
         using IApplication app = Application.Create ();
         app.Init ();
         app.Keyboard.KeyBindings.Remove (Key.Esc);
 
-        using Window window = new ()
-        {
-            Title = "Key Sequences - :q to Quit"
-        };
+        using Window window = new ();
+        window.Title = "Key Sequences - :q to Quit";
 
         Label title = new ()
         {
@@ -136,7 +131,6 @@ public sealed class KeySequencesDemo
                 AddMotionBindings (bindings, editor);
                 AddSelectionBindings (bindings, editor);
                 AddEditingBindings (bindings, editor);
-                AddQuitBinding (bindings, app);
 
                 bindings.StateChanged += (_, e) =>
                 {
@@ -177,6 +171,8 @@ public sealed class KeySequencesDemo
                 };
             },
             KeySequenceInterceptionMode.Preemptive);
+
+        AddQuitBinding (editor.GetKeySequences (), app);
 
         editor.SetFocus ();
         app.Run (window);

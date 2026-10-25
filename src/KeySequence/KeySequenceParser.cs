@@ -10,19 +10,19 @@ public static class KeySequenceParser
     {
         if (string.IsNullOrWhiteSpace (pattern))
         {
-            throw new ArgumentException (@"Pattern must not be empty.", nameof (pattern));
+            throw new ArgumentException ("Pattern must not be empty.", nameof (pattern));
         }
 
         string [] parts = SplitPattern (pattern);
 
         if (parts.Length == 0)
         {
-            throw new ArgumentException (@"Pattern must not be empty.", nameof (pattern));
+            throw new ArgumentException ("Pattern must not be empty.", nameof (pattern));
         }
 
         Key leaderKey = ParseKeyToken (parts [0]);
         KeySequencePattern sequencePattern = KeySequencePattern.Leader (leaderKey);
-        AddTokens (sequencePattern, parts, 1, pattern);
+        AddTokens (sequencePattern, parts, 1, nameof (pattern));
 
         return sequencePattern;
     }
@@ -32,19 +32,19 @@ public static class KeySequenceParser
     {
         if (string.IsNullOrWhiteSpace (pattern))
         {
-            throw new ArgumentException (@"Pattern must not be empty.", nameof (pattern));
+            throw new ArgumentException ("Pattern must not be empty.", nameof (pattern));
         }
 
         string [] parts = SplitPattern (pattern);
         KeySequencePattern sequencePattern = KeySequencePattern.CommandMode ();
-        AddTokens (sequencePattern, parts, 0, pattern);
+        AddTokens (sequencePattern, parts, 0, nameof (pattern));
 
         return sequencePattern;
     }
 
     private static string [] SplitPattern (string pattern) => pattern.Split (' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private static void AddTokens (KeySequencePattern sequencePattern, string [] parts, int start, string pattern)
+    private static void AddTokens (KeySequencePattern sequencePattern, string [] parts, int start, string parameterName)
     {
         bool hasCount = false;
 
@@ -56,7 +56,7 @@ public static class KeySequenceParser
             {
                 if (hasCount)
                 {
-                    throw new ArgumentException (@"Pattern can contain only one <count> token.", nameof (pattern));
+                    throw new ArgumentException ("Pattern can contain only one <count> token.", parameterName);
                 }
 
                 hasCount = true;
@@ -94,11 +94,8 @@ public static class KeySequenceParser
             return keyText [0];
         }
 
-        if (Key.TryParse (keyText, out Key key))
-        {
-            return key;
-        }
-
-        throw new FormatException ($"Invalid key sequence token: {token}");
+        return Key.TryParse (keyText, out Key key)
+            ? key
+            : throw new FormatException ($"Invalid key sequence token: {token}");
     }
 }

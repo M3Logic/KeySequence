@@ -6,24 +6,27 @@ namespace Terminal.Gui.KeySequence;
 /// <summary>Provides extension methods for attaching key sequences to applications.</summary>
 public static class KeySequenceApplicationExtensions
 {
-    /// <summary>Attaches sequence bindings to an application.</summary>
-    public static IDisposable UseKeySequences (this IApplication application, KeySequenceBindings bindings)
+    extension(IApplication application)
     {
-        ArgumentNullException.ThrowIfNull (application);
-        ArgumentNullException.ThrowIfNull (bindings);
+        /// <summary>Attaches sequence bindings to an application.</summary>
+        public IDisposable UseKeySequences (KeySequenceBindings bindings)
+        {
+            ArgumentNullException.ThrowIfNull (application);
+            ArgumentNullException.ThrowIfNull (bindings);
 
-        return new ApplicationKeySequenceRegistration (application, bindings);
-    }
+            return new ApplicationKeySequenceRegistration (application, bindings);
+        }
 
-    /// <summary>Creates and attaches sequence bindings to an application.</summary>
-    public static IDisposable UseKeySequences (this IApplication application, Action<KeySequenceBindings> configure)
-    {
-        ArgumentNullException.ThrowIfNull (configure);
+        /// <summary>Creates and attaches sequence bindings to an application.</summary>
+        public IDisposable UseKeySequences (Action<KeySequenceBindings> configure)
+        {
+            ArgumentNullException.ThrowIfNull (configure);
 
-        KeySequenceBindings bindings = new ();
-        configure (bindings);
+            KeySequenceBindings bindings = new ();
+            configure (bindings);
 
-        return application.UseKeySequences (bindings);
+            return application.UseKeySequences (bindings);
+        }
     }
 
     private sealed class ApplicationKeySequenceRegistration : IDisposable

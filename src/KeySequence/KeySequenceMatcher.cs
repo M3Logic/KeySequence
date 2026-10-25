@@ -120,15 +120,13 @@ internal static class KeySequenceMatcher
                 bestPrefix = match;
             }
 
-            if (i == keys.Count - 1)
+            if (i != keys.Count - 1) continue;
+            Dictionary<string, object?> prefixValues = new (values)
             {
-                Dictionary<string, object?> prefixValues = new (values)
-                {
-                    [name] = ParseCount (countText)
-                };
+                [name] = ParseCount (countText)
+            };
 
-                bestPrefix = CandidateMatch.Prefix (ParseCount (countText), prefixValues);
-            }
+            bestPrefix = CandidateMatch.Prefix (ParseCount (countText), prefixValues);
         }
 
         return bestPrefix;
@@ -197,11 +195,8 @@ internal static class KeySequenceMatcher
             return 1;
         }
 
-        if (!int.TryParse (countText, out int count))
-        {
-            return int.MaxValue;
-        }
-
-        return count;
+        return !int.TryParse (countText, out int count)
+            ? int.MaxValue
+            : count;
     }
 }
