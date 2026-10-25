@@ -37,8 +37,8 @@ internal static class KeySequenceMatcher
         if (tokenIndex == tokens.Count)
         {
             return keyIndex == keys.Count
-                       ? CandidateMatch.Complete (ParseCount (countText), values)
-                       : CandidateMatch.NoMatch;
+                ? CandidateMatch.Complete (ParseCount (countText), values)
+                : CandidateMatch.NoMatch;
         }
 
         KeySequenceToken token = tokens [tokenIndex];
@@ -46,9 +46,12 @@ internal static class KeySequenceMatcher
         return token.Kind switch
         {
             KeySequenceTokenKind.Literal => MatchLiteral (tokens, keys, tokenIndex, keyIndex, countText, values),
-            KeySequenceTokenKind.Count => MatchCount (tokens, keys, tokenIndex, keyIndex, values, token.Name ?? "count"),
-            KeySequenceTokenKind.Char => MatchChar (tokens, keys, tokenIndex, keyIndex, countText, values, token.Name ?? "char"),
-            KeySequenceTokenKind.AnyKey => MatchAnyKey (tokens, keys, tokenIndex, keyIndex, countText, values, token.Name ?? "key"),
+            KeySequenceTokenKind.Count => MatchCount (tokens, keys, tokenIndex, keyIndex, values,
+                token.Name ?? "count"),
+            KeySequenceTokenKind.Char => MatchChar (tokens, keys, tokenIndex, keyIndex, countText, values,
+                token.Name ?? "char"),
+            KeySequenceTokenKind.AnyKey => MatchAnyKey (tokens, keys, tokenIndex, keyIndex, countText, values,
+                token.Name ?? "key"),
             _ => CandidateMatch.NoMatch
         };
     }
@@ -76,7 +79,7 @@ internal static class KeySequenceMatcher
         return MatchFrom (tokens, keys, tokenIndex + 1, keyIndex + 1, countText, values);
     }
 
-    private static bool MatchesLiteral (Key expected, Key actual)
+    internal static bool MatchesLiteral (Key expected, Key actual)
     {
         if (expected == actual)
         {
@@ -100,52 +103,27 @@ internal static class KeySequenceMatcher
         Dictionary<string, object?> values,
         string name)
     {
-        CandidateMatch zeroDigitMatch = MatchFrom (tokens, keys, tokenIndex + 1, keyIndex, null, new Dictionary<string, object?> (values));
-
-        if (zeroDigitMatch.Kind == CandidateMatchKind.Complete)
-        {
-            return zeroDigitMatch;
-        }
-
         StringBuilder countBuilder = new ();
-        CandidateMatch bestPrefix = zeroDigitMatch.Kind == CandidateMatchKind.Prefix ? zeroDigitMatch : CandidateMatch.NoMatch;
+        int nextKeyIndex = keyIndex;
 
-        for (int i = keyIndex; i < keys.Count; i++)
+        while (nextKeyIndex < keys.Count && IsDigit (keys [nextKeyIndex], out char digit))
         {
-            if (!IsDigit (keys [i], out char digit))
-            {
-                break;
-            }
-
             countBuilder.Append (digit);
-            string countText = countBuilder.ToString ();
-            Dictionary<string, object?> nextValues = new (values)
-            {
-                [name] = ParseCount (countText)
-            };
-
-            CandidateMatch match = MatchFrom (tokens, keys, tokenIndex + 1, i + 1, countText, nextValues);
-
-            if (match.Kind == CandidateMatchKind.Complete)
-            {
-                return match;
-            }
-
-            if (match.Kind == CandidateMatchKind.Prefix)
-            {
-                bestPrefix = match;
-            }
-
-            if (i != keys.Count - 1) continue;
-            Dictionary<string, object?> prefixValues = new (values)
-            {
-                [name] = ParseCount (countText)
-            };
-
-            bestPrefix = CandidateMatch.Prefix (ParseCount (countText), prefixValues);
+            nextKeyIndex++;
         }
 
-        return bestPrefix;
+        if (countBuilder.Length == 0)
+        {
+            return MatchFrom (tokens, keys, tokenIndex + 1, keyIndex, null, new Dictionary<string, object?> (values));
+        }
+
+        string countText = countBuilder.ToString ();
+        Dictionary<string, object?> nextValues = new (values)
+        {
+            [name] = ParseCount (countText)
+        };
+
+        return MatchFrom (tokens, keys, tokenIndex + 1, nextKeyIndex, countText, nextValues);
     }
 
     private static CandidateMatch MatchChar (

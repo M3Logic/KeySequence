@@ -199,7 +199,7 @@ public enum KeySequenceMatchMode
 }
 ```
 
-`Longest` waits when a complete pattern is also a prefix of a longer pattern. `Immediate` executes as soon as the pattern is complete.
+`Longest` waits when a complete pattern is also a prefix of a longer pattern. If the longer candidate stops matching or capture times out, the completed shorter pattern runs. `Immediate` executes as soon as the pattern is complete.
 
 `KeySequencePattern.AllowZeroCount` allows a parsed count of `0`. Without it, a completed match with count `0` is rejected.
 

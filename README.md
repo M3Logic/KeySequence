@@ -11,7 +11,7 @@ alongside Terminal.Gui without patching the toolkit.
 - Disposable registrations
 
 Project/package: **KeySequence**. Root namespace: **Terminal.Gui.KeySequence**.
-Requires .NET 10 and Terminal.Gui 2.4.3 or a later 2.x release.
+Requires .NET 10 and Terminal.Gui 2.5.0 or a later 2.x release.
 
 ## Install from a local package
 

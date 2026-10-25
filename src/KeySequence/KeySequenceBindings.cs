@@ -13,6 +13,7 @@ public sealed class KeySequenceBindings
     private readonly HashSet<Key> _leaders = new (new KeyEqualityComparer ());
 
     private Key? _leaderKey;
+    private PendingLongestMatch? _pendingLongestMatch;
     private DateTimeOffset _lastKeyTime;
     private bool _isCommandMode;
 
@@ -58,7 +59,7 @@ public sealed class KeySequenceBindings
     public void RemoveLeader (Key leaderKey) => _leaders.Remove (leaderKey);
 
     /// <summary>Determines whether the specified key is a leader key.</summary>
-    public bool IsLeader (Key key) => _leaders.Contains (key);
+    public bool IsLeader (Key key) => _leaders.Any (leaderKey => KeySequenceMatcher.MatchesLiteral (leaderKey, key));
 
     /// <summary>Adds a sequence binding.</summary>
     public void Add (KeySequencePattern pattern, KeySequenceHandler handler)
@@ -100,7 +101,8 @@ public sealed class KeySequenceBindings
     public void Add (string pattern, KeySequenceHandler handler) => Add (KeySequenceParser.Parse (pattern), handler);
 
     /// <summary>Adds a persistent command-mode sequence binding from a compact pattern string.</summary>
-    public void AddMode (string pattern, KeySequenceHandler handler) => Add (KeySequenceParser.ParseCommandMode (pattern), handler);
+    public void AddMode (string pattern, KeySequenceHandler handler) =>
+        Add (KeySequenceParser.ParseCommandMode (pattern), handler);
 
     /// <summary>Removes a sequence binding.</summary>
     public bool Remove (KeySequencePattern pattern)
@@ -131,8 +133,10 @@ public sealed class KeySequenceBindings
         ArgumentNullException.ThrowIfNull (key);
 
         // Drivers may report modifier presses and repeats separately from the character they modify.
-        if (key.IsModifierOnly ||
-            key.KeyCode != KeyCode.Null && (key.KeyCode & ~(KeyCode.ShiftMask | KeyCode.CtrlMask | KeyCode.AltMask)) == KeyCode.Null)
+        if (key.EventType != KeyEventType.Press ||
+            key.IsModifierOnly ||
+            key.KeyCode != KeyCode.Null && (key.KeyCode & ~(KeyCode.ShiftMask | KeyCode.CtrlMask | KeyCode.AltMask)) ==
+            KeyCode.Null)
         {
             return IsCapturing ? KeySequenceResult.Pending : KeySequenceResult.NotLeader;
         }
@@ -165,14 +169,14 @@ public sealed class KeySequenceBindings
 
         if (!key.IsValid)
         {
-            Reset ();
+            ResetCore ();
             RaiseStateChanged (KeySequenceResult.Rejected, 0);
             return KeySequenceResult.Rejected;
         }
 
         if (key == CancelKey)
         {
-            Reset ();
+            ResetCore ();
             RaiseStateChanged (KeySequenceResult.Canceled, 0);
             return KeySequenceResult.Canceled;
         }
@@ -184,7 +188,7 @@ public sealed class KeySequenceBindings
 
         if (evaluation.Result != KeySequenceResult.Pending)
         {
-            Reset ();
+            ResetCore ();
         }
 
         RaiseStateChanged (evaluation.Result, evaluation.CandidateCount);
@@ -194,15 +198,27 @@ public sealed class KeySequenceBindings
     /// <summary>Resets active sequence capture.</summary>
     public void Reset ()
     {
+        bool hadSequence = _leaderKey is not null || _keys.Count > 0 || _pendingLongestMatch is not null;
+        ResetCore ();
+
+        if (hadSequence)
+        {
+            RaiseStateChanged (KeySequenceResult.Canceled, CandidateCount ());
+        }
+    }
+
+    private void ResetCore ()
+    {
         _leaderKey = null;
         _keys.Clear ();
+        _pendingLongestMatch = null;
     }
 
     /// <summary>Enters persistent command mode.</summary>
     public void EnterCommandMode ()
     {
         _isCommandMode = true;
-        Reset ();
+        ResetCore ();
         RaiseStateChanged (KeySequenceResult.ModeEntered, CandidateCount ());
     }
 
@@ -210,22 +226,33 @@ public sealed class KeySequenceBindings
     public void ExitCommandMode ()
     {
         _isCommandMode = false;
-        Reset ();
+        ResetCore ();
         RaiseStateChanged (KeySequenceResult.ModeExited, 0);
     }
 
     private KeySequenceResult ResetIfTimedOut ()
     {
-        if (!IsCapturing ||
-            _keys.Count == 0 ||
+        bool hasSequence = _leaderKey is not null || _keys.Count > 0;
+
+        if (!hasSequence ||
             Timeout <= TimeSpan.Zero ||
             TimeProvider.GetUtcNow () - _lastKeyTime <= Timeout)
         {
             return KeySequenceResult.NotLeader;
         }
 
-        Reset ();
-        RaiseStateChanged (KeySequenceResult.TimedOut, 0);
+        PendingLongestMatch? pendingLongestMatch = _pendingLongestMatch;
+        ResetCore ();
+
+        KeySequenceResult result = KeySequenceResult.TimedOut;
+
+        if (pendingLongestMatch is not null)
+        {
+            bool handled = pendingLongestMatch.Binding.Handler (pendingLongestMatch.Context);
+            result = handled ? KeySequenceResult.Matched : KeySequenceResult.Rejected;
+        }
+
+        RaiseStateChanged (result, 0);
         return KeySequenceResult.TimedOut;
     }
 
@@ -250,14 +277,14 @@ public sealed class KeySequenceBindings
 
         if (!key.IsValid)
         {
-            Reset ();
+            ResetCore ();
             RaiseStateChanged (KeySequenceResult.Rejected, CandidateCount ());
             return KeySequenceResult.Rejected;
         }
 
         if (key == CancelKey)
         {
-            Reset ();
+            ResetCore ();
             RaiseStateChanged (KeySequenceResult.Canceled, CandidateCount ());
             return KeySequenceResult.Canceled;
         }
@@ -269,7 +296,7 @@ public sealed class KeySequenceBindings
 
         if (evaluation.Result != KeySequenceResult.Pending)
         {
-            Reset ();
+            ResetCore ();
         }
 
         RaiseStateChanged (evaluation.Result, evaluation.CandidateCount);
@@ -300,6 +327,13 @@ public sealed class KeySequenceBindings
         {
             if (complete.Count == 0 && !binding.Pattern.AllowZeroCount)
             {
+                MatchEvaluation? fallback = ResolvePendingLongestMatch (candidateCount);
+
+                if (fallback is { } fallbackEvaluation)
+                {
+                    return fallbackEvaluation;
+                }
+
                 return new MatchEvaluation (KeySequenceResult.Rejected, candidateCount);
             }
 
@@ -307,19 +341,41 @@ public sealed class KeySequenceBindings
 
             if (hasLongerCandidate && binding.Pattern.MatchMode == KeySequenceMatchMode.Longest)
             {
+                KeySequenceContext pendingContext = CreateContext (target, binding.Pattern, complete, commandContext);
+                _pendingLongestMatch = new PendingLongestMatch (binding, pendingContext);
                 return new MatchEvaluation (KeySequenceResult.Pending, candidateCount);
             }
 
+            _pendingLongestMatch = null;
             KeySequenceContext context = CreateContext (target, binding.Pattern, complete, commandContext);
             bool handled = binding.Handler (context);
 
-            return new MatchEvaluation (handled ? KeySequenceResult.Matched : KeySequenceResult.Rejected, candidateCount);
+            return new MatchEvaluation (handled ? KeySequenceResult.Matched : KeySequenceResult.Rejected,
+                candidateCount);
         }
 
-        return matches.Any (m =>
-            m.Kind == CandidateMatchKind.Prefix)
-            ? new MatchEvaluation (KeySequenceResult.Pending, candidateCount)
-            : new MatchEvaluation (KeySequenceResult.Rejected, 0);
+        if (matches.Any (m => m.Kind == CandidateMatchKind.Prefix))
+        {
+            return new MatchEvaluation (KeySequenceResult.Pending, candidateCount);
+        }
+
+        return ResolvePendingLongestMatch (candidateCount) ?? new MatchEvaluation (KeySequenceResult.Rejected, 0);
+    }
+
+    private MatchEvaluation? ResolvePendingLongestMatch (int candidateCount)
+    {
+        PendingLongestMatch? pendingLongestMatch = _pendingLongestMatch;
+
+        if (pendingLongestMatch is null)
+        {
+            return null;
+        }
+
+        _pendingLongestMatch = null;
+        bool handled = pendingLongestMatch.Binding.Handler (pendingLongestMatch.Context);
+
+        return new MatchEvaluation (handled ? KeySequenceResult.Matched : KeySequenceResult.Rejected,
+            candidateCount);
     }
 
     private IEnumerable<KeySequenceBinding> GetCandidateBindings ()
@@ -336,10 +392,12 @@ public sealed class KeySequenceBindings
 
         Key activeLeader = _leaderKey;
 
-        return _bindings.Where (b => b.Pattern.LeaderKey is { } patternLeader && patternLeader == activeLeader);
+        return _bindings.Where (b => b.Pattern.LeaderKey is { } patternLeader &&
+                                     KeySequenceMatcher.MatchesLiteral (patternLeader, activeLeader));
     }
 
-    private KeySequenceContext CreateContext (View target, KeySequencePattern pattern, CandidateMatch match, CommandContext? commandContext)
+    private KeySequenceContext CreateContext (View target, KeySequencePattern pattern, CandidateMatch match,
+        CommandContext? commandContext)
     {
         List<Key> literalKeys =
         [
@@ -378,14 +436,18 @@ public sealed class KeySequenceBindings
 
         Key activeLeader = _leaderKey;
 
-        return _bindings.Count (b => b.Pattern.LeaderKey is { } patternLeader && patternLeader == activeLeader);
+        return _bindings.Count (b => b.Pattern.LeaderKey is { } patternLeader &&
+                                     KeySequenceMatcher.MatchesLiteral (patternLeader, activeLeader));
     }
 
     private void RaiseStateChanged (KeySequenceResult result, int candidateCount)
     {
         string countText = GetCountText ();
-        KeySequenceState state = _isCommandMode ? KeySequenceState.CommandMode : IsCapturing ? KeySequenceState.Capturing : KeySequenceState.Idle;
-        StateChanged?.Invoke (this, new KeySequenceStateChangedEventArgs (state, _leaderKey, [.. _keys], countText, candidateCount, result, _isCommandMode));
+        KeySequenceState state = _isCommandMode ? KeySequenceState.CommandMode :
+            IsCapturing ? KeySequenceState.Capturing : KeySequenceState.Idle;
+        StateChanged?.Invoke (this,
+            new KeySequenceStateChangedEventArgs (state, _leaderKey, [.. _keys], countText, candidateCount, result,
+                _isCommandMode));
     }
 
     private string GetCountText ()
@@ -404,4 +466,6 @@ public sealed class KeySequenceBindings
 
         return builder.ToString ();
     }
+
+    private sealed record PendingLongestMatch (KeySequenceBinding Binding, KeySequenceContext Context);
 }

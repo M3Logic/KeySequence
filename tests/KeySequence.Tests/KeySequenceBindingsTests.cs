@@ -48,6 +48,52 @@ public class KeySequenceBindingsTests
         Assert.Equal (1, invocations);
     }
 
+    [Fact]
+    public void Repeat_Events_Do_Not_Advance_Or_Complete_A_Sequence ()
+    {
+        KeySequenceBindings bindings = new ();
+        int invocations = 0;
+        List<KeySequenceResult> results = [];
+        bindings.StateChanged += (_, args) => results.Add (args.Result);
+        bindings.Add ("; d d", _ =>
+        {
+            invocations++;
+            return true;
+        });
+
+        using View target = new ();
+        bindings.ProcessKey (target, ';');
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, 'd'));
+        int notificationCount = results.Count;
+        Key repeatedD = new ('d') { EventType = KeyEventType.Repeat };
+
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, repeatedD));
+        Assert.Equal (notificationCount, results.Count);
+        Assert.Equal (0, invocations);
+        Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'd'));
+        Assert.Equal (1, invocations);
+    }
+
+    [Fact]
+    public void Printable_Leader_Matches_Shifted_Key_Event ()
+    {
+        KeySequenceBindings bindings = new ();
+        int invocations = 0;
+        bindings.Add (": q", _ =>
+        {
+            invocations++;
+            return true;
+        });
+
+        using View target = new ();
+        Key shiftedColon = new Key (':').WithShift;
+
+        Assert.True (bindings.IsLeader (shiftedColon));
+        Assert.Equal (KeySequenceResult.Started, bindings.ProcessKey (target, shiftedColon));
+        Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'q'));
+        Assert.Equal (1, invocations);
+    }
+
     [Theory]
     [InlineData ("q", "Ctrl+Q")]
     [InlineData ("q", "Alt+Q")]
@@ -85,6 +131,27 @@ public class KeySequenceBindingsTests
         Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'k'));
         Assert.Equal (4, moveCount);
         Assert.False (bindings.IsCapturing);
+    }
+
+    [Fact]
+    public void ProcessKey_Prefers_Count_Digits_Before_Character_Wildcard ()
+    {
+        KeySequenceBindings bindings = new ();
+        int count = 0;
+        Key? character = null;
+        bindings.Add ("; <count> <char>", context =>
+        {
+            count = context.Count;
+            character = (Key)context.Values ["char"]!;
+            return true;
+        });
+
+        using View target = new ();
+        bindings.ProcessKey (target, ';');
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, '4'));
+        Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'x'));
+        Assert.Equal (4, count);
+        Assert.Equal (new Key ('x'), character);
     }
 
     [Fact]
@@ -147,6 +214,111 @@ public class KeySequenceBindingsTests
         bindings.ProcessKey (target, ';');
 
         Assert.Equal (KeySequenceResult.Canceled, bindings.ProcessKey (target, Key.Esc));
+        Assert.False (bindings.IsCapturing);
+    }
+
+    [Fact]
+    public void Leader_Capture_Times_Out_Before_First_Sequence_Key ()
+    {
+        TestTimeProvider timeProvider = new () { CurrentTime = DateTimeOffset.UnixEpoch };
+        KeySequenceBindings bindings = new ()
+        {
+            TimeProvider = timeProvider,
+            Timeout = TimeSpan.FromSeconds (1)
+        };
+        List<KeySequenceStateChangedEventArgs> notifications = [];
+        bindings.StateChanged += (_, args) => notifications.Add (args);
+        bindings.Add ("; m k", _ => true);
+
+        using View target = new ();
+        Assert.Equal (KeySequenceResult.Started, bindings.ProcessKey (target, ';'));
+        timeProvider.CurrentTime += TimeSpan.FromSeconds (2);
+
+        Assert.Equal (KeySequenceResult.TimedOut, bindings.ProcessKey (target, 'x'));
+        Assert.False (bindings.IsCapturing);
+        Assert.Equal (KeySequenceResult.TimedOut, notifications [^1].Result);
+        Assert.Equal (KeySequenceState.Idle, notifications [^1].State);
+    }
+
+    [Fact]
+    public void Longest_Match_Falls_Back_When_Extension_Does_Not_Match ()
+    {
+        KeySequenceBindings bindings = new ();
+        int shortInvocations = 0;
+        int longInvocations = 0;
+        bindings.Add ("; g", _ =>
+        {
+            shortInvocations++;
+            return true;
+        });
+        bindings.Add ("; g g", _ =>
+        {
+            longInvocations++;
+            return true;
+        });
+
+        using View target = new ();
+        bindings.ProcessKey (target, ';');
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, 'g'));
+
+        Assert.Equal (KeySequenceResult.Matched, bindings.ProcessKey (target, 'x'));
+        Assert.Equal (1, shortInvocations);
+        Assert.Equal (0, longInvocations);
+        Assert.False (bindings.IsCapturing);
+    }
+
+    [Fact]
+    public void Longest_Match_Falls_Back_When_Extension_Times_Out ()
+    {
+        TestTimeProvider timeProvider = new () { CurrentTime = DateTimeOffset.UnixEpoch };
+        KeySequenceBindings bindings = new ()
+        {
+            TimeProvider = timeProvider,
+            Timeout = TimeSpan.FromSeconds (1)
+        };
+        int shortInvocations = 0;
+        int longInvocations = 0;
+        bindings.Add ("; g", _ =>
+        {
+            shortInvocations++;
+            return true;
+        });
+        bindings.Add ("; g g", _ =>
+        {
+            longInvocations++;
+            return true;
+        });
+
+        using View target = new ();
+        bindings.ProcessKey (target, ';');
+        Assert.Equal (KeySequenceResult.Pending, bindings.ProcessKey (target, 'g'));
+        timeProvider.CurrentTime += TimeSpan.FromSeconds (2);
+
+        Assert.Equal (KeySequenceResult.TimedOut, bindings.ProcessKey (target, 'x'));
+        Assert.Equal (1, shortInvocations);
+        Assert.Equal (0, longInvocations);
+        Assert.False (bindings.IsCapturing);
+    }
+
+    [Fact]
+    public void Reset_Raises_StateChanged_When_Capture_Is_Cleared ()
+    {
+        KeySequenceBindings bindings = new ();
+        List<KeySequenceStateChangedEventArgs> notifications = [];
+        bindings.StateChanged += (_, args) => notifications.Add (args);
+        bindings.Add ("; m k", _ => true);
+
+        using View target = new ();
+        bindings.ProcessKey (target, ';');
+        bindings.ProcessKey (target, 'm');
+        int notificationCount = notifications.Count;
+
+        bindings.Reset ();
+
+        Assert.Equal (notificationCount + 1, notifications.Count);
+        Assert.Equal (KeySequenceResult.Canceled, notifications [^1].Result);
+        Assert.Equal (KeySequenceState.Idle, notifications [^1].State);
+        Assert.Empty (notifications [^1].Keys);
         Assert.False (bindings.IsCapturing);
     }
 
@@ -223,5 +395,12 @@ public class KeySequenceBindingsTests
 
         Assert.Equal (KeySequenceResult.Rejected, bindings.ProcessKey (target, 'x'));
         Assert.True (bindings.IsCommandMode);
+    }
+
+    private sealed class TestTimeProvider : TimeProvider
+    {
+        public DateTimeOffset CurrentTime { get; set; }
+
+        public override DateTimeOffset GetUtcNow () => CurrentTime;
     }
 }
